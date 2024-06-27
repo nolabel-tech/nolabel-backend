@@ -16,6 +16,6 @@ spec:
     spec:
       containers:
       - name: python-app
-        image: nolabel-tech/python-app:latest
+        image: nolabelregistry/nolabel-backend:latest
         ports:
         - containerPort: 80
