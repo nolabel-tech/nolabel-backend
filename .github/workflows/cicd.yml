@@ -31,33 +31,6 @@ jobs:
             nolabelregistry/nolabel-backend:latest
             nolabelregistry/nolabel-backend:${{ github.sha }}
 
-
-  update-argo-cd-application:
-    needs: update-and-upload-helm-chart
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Argo CD repo
-        uses: actions/checkout@v2
-        with:
-          repository: nolabel-tech/argocd
-          token: ${{ secrets.GITHUB_TOKEN }}
-          path: argocd
-
-      - name: Update Argo CD application file
-        run: |
-          sed -i "s|image: .*|image: nolabelregistry/${{ github.repository }}:${{ github.sha }}|" argocd/nolabel-backend/app.yaml
-          cat argocd/nolabel-backend/app.yaml
-
-      - name: Commit and push changes
-        run: |
-          cd argocd-repo
-          git config --global user.email "action@github.com"
-          git config --global user.name "GitHub Action"
-          git add nolabel-backend/app.yaml
-          git commit -m "Update image tag to ${{ github.sha }} for nolabel-backend"
-          git push
-
-
   trigger-argocd:
     needs: update-argo-cd-application
     runs-on: ubuntu-latest
