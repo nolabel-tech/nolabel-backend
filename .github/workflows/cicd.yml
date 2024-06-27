@@ -28,8 +28,8 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: |
-            nolabelregistry/${{ github.repository }}:latest
-            nolabelregistry/${{ github.repository }}:${{ github.sha }}
+            nolabelregistry/nolabel-backend:latest
+            nolabelregistry/nolabel-backend:${{ github.sha }}
 
   update-and-upload-helm-chart:
     needs: build-and-push-docker
