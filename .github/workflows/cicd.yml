@@ -31,27 +31,6 @@ jobs:
             nolabelregistry/nolabel-backend:latest
             nolabelregistry/nolabel-backend:${{ github.sha }}
 
-  update-and-upload-helm-chart:
-    needs: build-and-push-docker
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Update Helm chart
-        run: |
-          sed -i "s|image: .*|image: nolabelregistry/${{ github.repository }}:${{ github.sha }}|" ./helm/values.yaml
-          cat ./helm/values.yaml
-
-      - name: Package Helm chart
-        run: helm package ./helm
-
-      - name: Upload Helm chart
-        uses: actions/upload-artifact@v2
-        with:
-          name: ${{ github.repository }}
-          path: ${{ github.repository }}-*.tgz
-
 
   update-argo-cd-application:
     needs: update-and-upload-helm-chart
