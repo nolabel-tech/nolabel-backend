@@ -32,7 +32,7 @@ jobs:
             nolabelregistry/nolabel-backend:${{ github.sha }}
 
   trigger-argocd:
-    needs: update-argo-cd-application
+    needs: build-and-push-docker
     runs-on: ubuntu-latest
     steps:
       - name: Trigger Argo CD
