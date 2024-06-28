@@ -2,6 +2,9 @@ apiVersion: v1
 kind: Service
 metadata:
   name: python-app-service
+  namespace: nolabel-dev
+  annotations:
+    traefik.mesh.traefik.io/traffic-type: "HTTP"
 spec:
   type: ClusterIP
   selector:
@@ -10,4 +13,3 @@ spec:
     - protocol: TCP
       port: 80
       targetPort: 80
-
