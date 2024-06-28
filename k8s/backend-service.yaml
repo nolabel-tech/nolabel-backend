@@ -3,9 +3,11 @@ kind: Service
 metadata:
   name: python-app-service
 spec:
+  type: ClusterIP
   selector:
     app: python-app
   ports:
     - protocol: TCP
       port: 80
       targetPort: 80
+
