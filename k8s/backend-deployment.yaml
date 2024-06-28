@@ -19,6 +19,3 @@ spec:
         image: nolabelregistry/nolabel-backend:latest
         ports:
         - containerPort: 80
-        env:
-        - name: API_URL
-          value: "http://python-app-service.nolabel-dev.svc.cluster.local"
