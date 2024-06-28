@@ -6,10 +6,8 @@ COPY ./requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY ./sm2 .
+COPY . .
 
 EXPOSE 8000
 
-ENV DJANGO_SETTINGS_MODULE=sm2.settings
-
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+CMD ["daphne", "-p", "8000", "sm2.asgi:application"]
