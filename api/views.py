@@ -1,26 +1,17 @@
 from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
 from .models import User, Message
+from .models import User, Contact
 from .serializers import UserSerializer, RegisterSerializer, LoginSerializer, MessageSerializer
-
 
 class RegisterView(APIView):
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
-            return Response({"token": user.token}, status=status.HTTP_201_CREATED)
+            return Response({"token": user.token, "unique": user.unique}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-# api/views.py
-
-from django.contrib.auth import authenticate, get_user_model
-
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from .models import User
-
 
 class LoginView(APIView):
     def post(self, request):
@@ -31,18 +22,13 @@ class LoginView(APIView):
             user = User.objects.get(username=username)
             if user.check_password(password):
                 if user.is_active:
-                    # Пользователь успешно аутентифицирован
-                    return Response({"token": user.token}, status=status.HTTP_200_OK)
+                    return Response({"token": user.token, "unique": user.unique}, status=status.HTTP_200_OK)
                 else:
                     return Response({"error": "Account is disabled."}, status=status.HTTP_403_FORBIDDEN)
             else:
-                print(password)
-                # Неправильный пароль
                 return Response({"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
         except User.DoesNotExist:
-            # Пользователь не найден
             return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
-
 
 class ContactView(APIView):
     def post(self, request):
@@ -51,7 +37,6 @@ class ContactView(APIView):
             return Response({"unique": user.unique}, status=status.HTTP_200_OK)
         except User.DoesNotExist:
             return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
-
 
 class SendMessageView(APIView):
     def post(self, request):
@@ -62,18 +47,21 @@ class SendMessageView(APIView):
         try:
             recipient = User.objects.get(unique=recipient_unique)
             from_user = User.objects.get(unique=from_user_unique)
+
             # Создаем сообщение в базе данных
             message = Message.objects.create(
                 sender=from_user,
                 recipient=recipient,
                 content=message_content
             )
-            # Логика доставки сообщения
-            # Например, можно отправить HTTP запрос на клиентское приложение получателя, если оно поддерживает такой прием
-            # Здесь может быть интеграция с внешним сервисом или использование существующих клиентских соединений
-            # Эмулируем доставку:
             message.delivered = True
             message.save()
+
+            # Добавляем отправителя в контакты получателя, если его там еще нет
+            if not recipient.contacts.filter(unique=from_user_unique).exists():
+                recipient.contacts.add(from_user)
+                recipient.save()
+
             return Response(
                 {"message": "Message sent successfully", "from": from_user.username, "to": recipient.username},
                 status=200)
@@ -86,8 +74,31 @@ class CheckMessagesView(APIView):
         try:
             user = User.objects.get(unique=unique)
             messages = Message.objects.filter(recipient=user, delivered=False)
-            messages.update(delivered=True)  # Помечаем сообщения как доставленные
+            messages.update(delivered=True)
             serializer = MessageSerializer(messages, many=True)
             return Response(serializer.data)
         except User.DoesNotExist:
-            return Response({"error": "User not found"}, status=404)
+            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+
+class AddContactView(APIView):
+    def post(self, request):
+        try:
+            username = request.data.get('username')
+            email = request.data.get('email')
+            contact_user = User.objects.get(username=username, email=email)
+            current_user = User.objects.get(unique=request.data.get('unique'))
+
+            # Создаем уникальный идентификатор комнаты
+            ids = sorted([current_user.unique, contact_user.unique])
+            room_id = '_'.join(ids)
+
+            # Сохраняем контакт для обоих пользователей
+            Contact.objects.create(user=current_user, contact=contact_user, room_id=room_id)
+            Contact.objects.create(user=contact_user, contact=current_user, room_id=room_id)
+
+            return Response({"room_id": room_id, "unique": contact_user.unique}, status=status.HTTP_200_OK)
+        except User.DoesNotExist:
+            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
