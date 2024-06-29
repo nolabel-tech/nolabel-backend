@@ -49,3 +49,21 @@ class MessageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Message
         fields = ['id', 'sender_username', 'recipient_username', 'content', 'created_at', 'delivered']
+
+
+class UpdateUserSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, required=False)
+
+    class Meta:
+        model = User
+        fields = ['username', 'email', 'password']
+
+    def update(self, instance, validated_data):
+        if 'username' in validated_data:
+            instance.username = validated_data['username']
+        if 'email' in validated_data:
+            instance.email = validated_data['email']
+        if 'password' in validated_data:
+            instance.set_password(validated_data['password'])
+        instance.save()
+        return instance
