@@ -39,9 +39,10 @@ class UserManager(BaseUserManager):
 
 class User(AbstractBaseUser):
     email = models.EmailField(verbose_name='email address', max_length=255, unique=True)
-    username = models.CharField(max_length=255, unique=True)  # Убедитесь, что username также уникален
+    username = models.CharField(max_length=255, unique=True)
     unique = models.CharField(max_length=255, unique=True)
     token = models.CharField(max_length=255, unique=True)
+    contacts = models.ManyToManyField('self', blank=True, symmetrical=False, related_name='user_contacts')
 
     is_active = models.BooleanField(default=True)
     is_admin = models.BooleanField(default=False)
@@ -49,11 +50,11 @@ class User(AbstractBaseUser):
 
     objects = UserManager()
 
-    USERNAME_FIELD = 'username'  # Изменено на username
-    REQUIRED_FIELDS = ['email', 'unique']  # Email теперь в списке обязательных полей
+    USERNAME_FIELD = 'username'
+    REQUIRED_FIELDS = ['email', 'unique']
 
     def __str__(self):
-        return self.username  # Возвращаем username вместо email
+        return self.username
 
     def generate_unique_token(self):
         while True:
@@ -61,6 +62,13 @@ class User(AbstractBaseUser):
             if not User.objects.filter(token=token).exists():
                 return token
 
+class Contact(models.Model):
+    user = models.ForeignKey(User, related_name='user', on_delete=models.CASCADE)
+    contact = models.ForeignKey(User, related_name='contact', on_delete=models.CASCADE)
+    room_id = models.CharField(max_length=255)
+
+    def __str__(self):
+        return f"{self.user.username} -> {self.contact.username} in room {self.room_id}"
 
 class Message(models.Model):
     sender = models.ForeignKey(User, related_name='sent_messages', on_delete=models.CASCADE)
