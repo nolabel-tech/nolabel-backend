@@ -1,9 +1,14 @@
+import logging
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from .models import User, Message
 from .models import User, Contact
-from .serializers import UserSerializer, RegisterSerializer, LoginSerializer, MessageSerializer
+from .serializers import UserSerializer, RegisterSerializer, LoginSerializer, MessageSerializer, UpdateUserSerializer
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+from rest_framework.views import APIView
+
 
 class RegisterView(APIView):
     def post(self, request):
@@ -81,6 +86,8 @@ class CheckMessagesView(APIView):
             return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
 
 
+logger = logging.getLogger(__name__)
+
 class AddContactView(APIView):
     def post(self, request):
         try:
@@ -93,12 +100,49 @@ class AddContactView(APIView):
             ids = sorted([current_user.unique, contact_user.unique])
             room_id = '_'.join(ids)
 
-            # Сохраняем контакт для обоих пользователей
-            Contact.objects.create(user=current_user, contact=contact_user, room_id=room_id)
-            Contact.objects.create(user=contact_user, contact=current_user, room_id=room_id)
+            # Проверяем, существует ли уже такой контакт у текущего пользователя
+            if not Contact.objects.filter(user=current_user, contact=contact_user).exists():
+                Contact.objects.create(user=current_user, contact=contact_user, room_id=room_id)
+            
+            # Проверяем, существует ли уже такой контакт у контактного пользователя
+            if not Contact.objects.filter(user=contact_user, contact=current_user).exists():
+                Contact.objects.create(user=contact_user, contact=current_user, room_id=room_id)
+
+                # Уведомление второго пользователя о добавлении контакта
+                channel_layer = get_channel_layer()
+                async_to_sync(channel_layer.group_send)(
+                    f"user_{contact_user.unique}",
+                    {
+                        "type": "contact.added",
+                        "message": {
+                            "username": current_user.username,
+                            "email": current_user.email,
+                            "unique": current_user.unique,
+                            "room_id": room_id
+                        }
+                    }
+                )
 
             return Response({"room_id": room_id, "unique": contact_user.unique}, status=status.HTTP_200_OK)
         except User.DoesNotExist:
             return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
+            logger.error(f"Error in AddContactView: {str(e)}")
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class UpdateUserView(APIView):
+    def post(self, request):
+        unique = request.data.get('unique')
+        try:
+            user = User.objects.get(unique=unique)
+            serializer = UpdateUserSerializer(user, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response({"message": "User details updated successfully"}, status=status.HTTP_200_OK)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except User.DoesNotExist:
+            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            logging.error(f"Error in UpdateUserView: {str(e)}")
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
